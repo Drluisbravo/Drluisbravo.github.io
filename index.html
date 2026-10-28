@@ -197,6 +197,7 @@ footer{
     <span>© <span id="anio">2026</span> Dr. Luis Bravo</span>
     <span>Lima, Perú</span>
     <span>Próximamente</span>
+    <span>Este sitio registra la IP y el navegador de cada visita con fines estadísticos y de seguridad.</span>
   </footer>
 </div>
 
@@ -247,6 +248,59 @@ fetch(`https://countapi.mileshilliard.com/api/v1/${accion}/${CLAVE}`)
     elPos.textContent = 'N.° ' + local.toLocaleString('es-PE');
     document.querySelector('.contador .titulo').textContent = 'Visitas en este navegador';
   });
+
+/* ─────────────────────────────────────────────────────────────
+   REGISTRO DE VISITAS EN GOOGLE SHEETS
+   1. Obtiene la IP pública del visitante con api.ipify.org
+   2. Envía la visita al Google Apps Script, que la agrega a la hoja.
+   Pega en URL_REGISTRO la URL de tu aplicación web (termina en /exec).
+   ───────────────────────────────────────────────────────────── */
+const URL_REGISTRO   = 'https://script.google.com/macros/s/AKfycbyuvPmspdlWiZ2JhVfqwWWR8vgl4etyD8pi19XZuwovVZUyTY1zEuzXUlD1M_Sx1eI/exec';
+const CLAVE_REGISTRO = 'AKfycbyuvPmspdlWiZ2JhVfqwWWR8vgl4etyD8pi19XZuwovVZUyTY1zEuzXUlD1M_Sx1eI';   // igual que CLAVE en Codigo.gs
+
+(function registrarVisita(){
+  if (location.protocol === 'file:') return;           // abierto en local: no registra
+  if (!/^https:\/\/script\.google\.com\//.test(URL_REGISTRO)) return;   // falta configurar
+
+  let sesion = '-';
+  try {
+    sesion = sessionStorage.getItem('sesion_log') || '';
+    if (!sesion) {
+      sesion = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      sessionStorage.setItem('sesion_log', sesion);
+    }
+  } catch (e) {}
+
+  function enviar(ip){
+    const datos = JSON.stringify({
+      clave: CLAVE_REGISTRO,
+      evento: 'visita',
+      ip: ip || '-',
+      pagina: location.pathname + location.search + location.hash,
+      referencia: document.referrer || '-',
+      idioma: navigator.language || '-',
+      zona: (Intl.DateTimeFormat().resolvedOptions().timeZone) || '-',
+      pantalla: screen.width + 'x' + screen.height,
+      sesion: sesion || '-',
+      navegador: navigator.userAgent || '-'
+    });
+    // text/plain + no-cors: Google acepta el envío sin bloqueo por CORS
+    fetch(URL_REGISTRO, {
+      method: 'POST', mode: 'no-cors', keepalive: true,
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: datos
+    }).catch(() => {});
+  }
+
+  // Si ipify no responde en 3 s, se registra la visita sin IP
+  const espera = new AbortController();
+  const temporizador = setTimeout(() => espera.abort(), 3000);
+  fetch('https://api.ipify.org?format=json', { signal: espera.signal })
+    .then(r => r.json())
+    .then(d => enviar(d.ip))
+    .catch(() => enviar('-'))
+    .finally(() => clearTimeout(temporizador));
+})();
 </script>
 </body>
 </html>
