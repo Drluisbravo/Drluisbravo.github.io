@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://drluisbravo.com/sitemap.xml
